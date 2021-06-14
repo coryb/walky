@@ -1,3 +1,5 @@
+[![Go Reference](https://pkg.go.dev/badge/github.com/coryb/walky.svg)](https://pkg.go.dev/github.com/coryb/walky)
+
 # walky - Walk YAML
 This is a companion to `go-yaml/yaml.v3` to walk and modify abstract `*yaml.Node` trees.
 
