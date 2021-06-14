@@ -91,7 +91,7 @@ func TestWalk(t *testing.T) {
 	require.Equal(t, 8, traversed)
 
 	collected = []string{}
-	err = walky.Walk(&root, walky.KeyStringWalker("e", func(n *yaml.Node) error {
+	err = walky.Walk(&root, walky.StringWalker("e", func(n *yaml.Node) error {
 		return walky.Walk(n, walky.ScalarValuesWalker(func(n *yaml.Node) error {
 			collected = append(collected, n.Value)
 			return nil
@@ -101,7 +101,7 @@ func TestWalk(t *testing.T) {
 	require.Equal(t, []string{"6", "7"}, collected)
 
 	collected = []string{}
-	err = walky.Walk(&root, walky.KeyStringWalker("i", func(n *yaml.Node) error {
+	err = walky.Walk(&root, walky.StringWalker("i", func(n *yaml.Node) error {
 		return walky.Walk(n, walky.ScalarValuesWalker(func(n *yaml.Node) error {
 			collected = append(collected, n.Value)
 			return nil
@@ -112,7 +112,7 @@ func TestWalk(t *testing.T) {
 	collected = []string{}
 
 	collected = []string{}
-	err = walky.Walk(&root, walky.KeyStringWalker("h", func(n *yaml.Node) error {
+	err = walky.Walk(&root, walky.StringWalker("h", func(n *yaml.Node) error {
 		return walky.Walk(n, walky.ScalarValuesWalker(func(n *yaml.Node) error {
 			collected = append(collected, n.Value)
 			return nil
@@ -122,7 +122,7 @@ func TestWalk(t *testing.T) {
 	require.Equal(t, []string{"10", "11", "12", "13", "14", "15"}, collected)
 
 	collected = []string{}
-	err = walky.Walk(&root, walky.KeyStringWalker("h", func(n *yaml.Node) error {
+	err = walky.Walk(&root, walky.StringWalker("h", func(n *yaml.Node) error {
 		return walky.Walk(n, walky.ScalarValuesWalker(func(n *yaml.Node) error {
 			collected = append(collected, n.Value)
 			return nil
@@ -132,7 +132,7 @@ func TestWalk(t *testing.T) {
 	require.Equal(t, []string{"12", "13", "14", "15", "10", "11"}, collected)
 
 	collected = []string{}
-	err = walky.Walk(&root, walky.KeyStringWalker("h", func(n *yaml.Node) error {
+	err = walky.Walk(&root, walky.StringWalker("h", func(n *yaml.Node) error {
 		return walky.Walk(n, walky.ScalarValuesWalker(func(n *yaml.Node) error {
 			collected = append(collected, n.Value)
 			return nil
@@ -142,7 +142,7 @@ func TestWalk(t *testing.T) {
 	require.Equal(t, []string{"10", "11"}, collected)
 
 	collected = []string{}
-	err = walky.Walk(&root, walky.KeyStringWalker("h", func(n *yaml.Node) error {
+	err = walky.Walk(&root, walky.StringWalker("h", func(n *yaml.Node) error {
 		return walky.Walk(n, walky.ScalarValuesWalker(func(n *yaml.Node) error {
 			collected = append(collected, n.Value)
 			return nil
@@ -192,25 +192,25 @@ func TestWalkPath(t *testing.T) {
 		}
 	}
 	err = walky.WalkPathMatchers(&root, expectedInt(2),
-		walky.KeyMatcher("a"),
+		walky.StringMatcher("a"),
 		walky.IndexMatcher(1),
 	)
 	require.NoError(t, err)
 	require.True(t, matchFound)
 
 	err = walky.WalkPathMatchers(&root, expectedInt(6),
-		walky.KeyMatcher("b"),
-		walky.KeyMatcher("d"),
-		walky.KeyMatcher("e"),
+		walky.StringMatcher("b"),
+		walky.StringMatcher("d"),
+		walky.StringMatcher("e"),
 		walky.IndexMatcher(0),
 	)
 	require.NoError(t, err)
 	require.True(t, matchFound)
 
 	err = walky.WalkPathMatchers(&root, expectedInt(15),
-		walky.KeyMatcher("h"),
+		walky.StringMatcher("h"),
 		walky.IndexMatcher(2),
-		walky.KeyMatcher("i"),
+		walky.StringMatcher("i"),
 		walky.IndexMatcher(1),
 	)
 	require.NoError(t, err)
@@ -225,7 +225,7 @@ func TestWalkPath(t *testing.T) {
 	}
 	err = walky.WalkPathMatchers(&root, expectSequence(expectedInt(7), expectedInt(17)),
 		walky.AnyMatcher(),
-		walky.KeyMatcher("e"),
+		walky.StringMatcher("e"),
 		walky.IndexMatcher(1),
 	)
 	require.NoError(t, err)
@@ -233,7 +233,7 @@ func TestWalkPath(t *testing.T) {
 
 	err = walky.WalkPathMatchers(&root, expectSequence(expectedInt(17), expectedInt(7)),
 		walky.AnyMatcher(walky.WithBreadthFirst()),
-		walky.KeyMatcher("e"),
+		walky.StringMatcher("e"),
 		walky.IndexMatcher(1),
 	)
 	require.NoError(t, err)

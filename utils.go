@@ -174,6 +174,10 @@ func AppendNode(listNode, valNode *yaml.Node) error {
 }
 
 func HasKey(mapNode *yaml.Node, key interface{}) bool {
+	mapNode = unwrapDocument(mapNode)
+	if mapNode.Kind != yaml.MappingNode {
+		return false
+	}
 	found := false
 	WalkPath(mapNode, func(n *yaml.Node) error {
 		found = true

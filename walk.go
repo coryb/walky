@@ -188,25 +188,20 @@ func ScalarValuesWalker(f NodeFunc) WalkFunc {
 	}
 }
 
-// func WalkScalarValues(root *yaml.Node, f func(*yaml.Node) error, opts ...WalkOpt) error {
-// 	return Walk(root, ScalarValues(f, opts...))
-// }
-
-// func WalkKeyString(root *yaml.Node, key string, f func(*yaml.Node) error, opts ...WalkOpt) error {
-// 	return Walk(root, KeyString(key, f, opts...))
-// }
-
-// KeyStringWalker is used with Walk to apply `f` to map values that match the
-// provided key string.
-func KeyStringWalker(key string, f NodeFunc) WalkFunc {
+// StringWalker is used with Walk to apply `f` to map values that match the
+// provided key string.  If the match is against a map key then the `NodeFunc`
+// will be called with the map value.  If the match is not a map key, then
+// the `NodeFunc` will be called on the matched node.
+func StringWalker(key string, f NodeFunc) WalkFunc {
 	return func(current, parent *yaml.Node, pos int, opts *WalkOptions) (WalkStatus, error) {
-		if parent == nil || parent.Kind != yaml.MappingNode {
-			return opts.MissStatus, nil
-		}
 		if current.Value != key {
 			return opts.MissStatus, nil
 		}
-		err := f(parent.Content[pos+1])
+		if parent != nil && parent.Kind == yaml.MappingNode {
+			err := f(parent.Content[pos+1])
+			return opts.MatchStatus(), err
+		}
+		err := f(current)
 		return opts.MatchStatus(), err
 	}
 }
@@ -231,17 +226,17 @@ type PathMatcher interface {
 	Match(node *yaml.Node, fn NodeFunc) error
 }
 
-func KeyMatcher(key string) PathMatcher {
-	return keyPathMatcher(key)
+func StringMatcher(key string) PathMatcher {
+	return stringPathMatcher(key)
 }
 
-type keyPathMatcher string
+type stringPathMatcher string
 
-func (pm keyPathMatcher) Match(node *yaml.Node, fn NodeFunc) error {
+func (pm stringPathMatcher) Match(node *yaml.Node, fn NodeFunc) error {
 	if node.Kind != yaml.MappingNode {
 		return nil
 	}
-	return Walk(node, KeyStringWalker(string(pm), fn), WithMaxDepth(0))
+	return Walk(node, StringWalker(string(pm), fn), WithMaxDepth(0))
 }
 
 func NodeMatcher(n *yaml.Node) PathMatcher {
@@ -254,6 +249,10 @@ func (pm *nodePathMatcher) Match(node *yaml.Node, fn NodeFunc) error {
 	return Walk(node, func(current, parent *yaml.Node, pos int, opts *WalkOptions) (WalkStatus, error) {
 		if !Equal((*yaml.Node)(pm), current) {
 			return opts.MissStatus, nil
+		}
+		if parent != nil && parent.Kind == yaml.MappingNode {
+			err := fn(parent.Content[pos+1])
+			return opts.MatchStatus(), err
 		}
 		err := fn(current)
 		return opts.MatchStatus(), err
@@ -311,7 +310,7 @@ func WalkPath(root *yaml.Node, fn NodeFunc, path ...interface{}) error {
 	for _, p := range path {
 		switch pp := p.(type) {
 		case string:
-			matchers = append(matchers, KeyMatcher(pp))
+			matchers = append(matchers, StringMatcher(pp))
 		case int:
 			matchers = append(matchers, IndexMatcher(pp))
 		case *yaml.Node:
