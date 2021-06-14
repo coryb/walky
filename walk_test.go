@@ -375,6 +375,33 @@ func TestWalkAssign(t *testing.T) {
 	}
 }
 
+func TestHasKey(t *testing.T) {
+	doc := HereBytes(`
+		key: val
+	`)
+	var root yaml.Node
+	err := yaml.Unmarshal(doc, &root)
+	require.NoError(t, err)
+
+	found := walky.HasKey(&root, "key")
+	require.True(t, found)
+
+	keyNode, err := walky.ToNode("key")
+	require.NoError(t, err)
+
+	found = walky.HasKey(&root, keyNode)
+	require.True(t, found)
+
+	found = walky.HasKey(&root, "nope")
+	require.False(t, found)
+
+	keyNode, err = walky.ToNode("nope")
+	require.NoError(t, err)
+
+	found = walky.HasKey(&root, keyNode)
+	require.False(t, found)
+}
+
 func ExampleWalkPath() {
 	doc := `# foo is a bar
 foo: bar

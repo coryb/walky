@@ -257,7 +257,7 @@ func (pm *nodePathMatcher) Match(node *yaml.Node, fn NodeFunc) error {
 		}
 		err := fn(current)
 		return opts.MatchStatus(), err
-	})
+	}, WithMaxDepth(0))
 }
 
 func IndexMatcher(i int) PathMatcher {

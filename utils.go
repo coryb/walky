@@ -172,3 +172,12 @@ func AppendNode(listNode, valNode *yaml.Node) error {
 	listNode.Content = append(listNode.Content, valNode)
 	return nil
 }
+
+func HasKey(mapNode *yaml.Node, key interface{}) bool {
+	found := false
+	WalkPath(mapNode, func(n *yaml.Node) error {
+		found = true
+		return nil
+	}, key)
+	return found
+}
