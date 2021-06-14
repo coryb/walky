@@ -28,11 +28,15 @@ func ToNode(val interface{}) (*yaml.Node, error) {
 		node.SetString(v)
 		return &node, nil
 	}
-	err := node.Encode(val)
+	content, err := yaml.Marshal(val)
 	if err != nil {
 		return nil, err
 	}
-	return &node, nil
+	err = yaml.Unmarshal(content, &node)
+	if err != nil {
+		return nil, err
+	}
+	return unwrapDocument(&node), nil
 }
 
 type sortableNodeMap []*yaml.Node
