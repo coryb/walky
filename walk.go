@@ -34,24 +34,28 @@ type WalkFunc func(current, parent *yaml.Node, position int, opts *WalkOptions) 
 type NodeFunc func(node *yaml.Node) error
 
 type WalkOptions struct {
-	MissStatus  WalkStatus
+	missStatus  WalkStatus
 	matchStatus *WalkStatus
 	maxDepth    int
 	trace       func(current, parent *yaml.Node, pos, depth int, status WalkStatus, err error)
+}
+
+func (opts *WalkOptions) MissStatus() WalkStatus {
+	return opts.missStatus
 }
 
 func (opts *WalkOptions) MatchStatus() WalkStatus {
 	if opts.matchStatus != nil {
 		return *opts.matchStatus
 	}
-	return opts.MissStatus
+	return opts.missStatus
 }
 
 type WalkOpt func(*WalkOptions)
 
 func WithBreadthFirst() WalkOpt {
 	return func(opt *WalkOptions) {
-		opt.MissStatus = WalkBreadthFirst
+		opt.missStatus = WalkBreadthFirst
 	}
 }
 
@@ -76,7 +80,7 @@ func WithTrace(f func(current, parent *yaml.Node, pos, depth int, ws WalkStatus,
 
 func Walk(node *yaml.Node, f WalkFunc, walkOpts ...WalkOpt) error {
 	opts := &WalkOptions{
-		MissStatus: WalkDepthFirst,
+		missStatus: WalkDepthFirst,
 		maxDepth:   -1,
 	}
 
@@ -181,7 +185,7 @@ func walk(node, parent *yaml.Node, f WalkFunc, depth int, opts *WalkOptions) (Wa
 func ScalarValuesWalker(f NodeFunc) WalkFunc {
 	return func(current, parent *yaml.Node, pos int, opts *WalkOptions) (ws WalkStatus, err error) {
 		if current.Kind != yaml.ScalarNode || parent.Kind == yaml.MappingNode {
-			return opts.MissStatus, nil
+			return opts.missStatus, nil
 		}
 		err = f(current)
 		return opts.MatchStatus(), err
@@ -195,7 +199,7 @@ func ScalarValuesWalker(f NodeFunc) WalkFunc {
 func StringWalker(key string, f NodeFunc) WalkFunc {
 	return func(current, parent *yaml.Node, pos int, opts *WalkOptions) (WalkStatus, error) {
 		if current.Value != key {
-			return opts.MissStatus, nil
+			return opts.missStatus, nil
 		}
 		if parent != nil && parent.Kind == yaml.MappingNode {
 			err := f(parent.Content[pos+1])
@@ -209,7 +213,7 @@ func StringWalker(key string, f NodeFunc) WalkFunc {
 func IndexWalker(ix int, f NodeFunc) WalkFunc {
 	return func(current, parent *yaml.Node, pos int, opts *WalkOptions) (WalkStatus, error) {
 		if parent == nil || parent.Kind != yaml.SequenceNode {
-			return opts.MissStatus, nil
+			return opts.missStatus, nil
 		}
 		if ix > pos {
 			return WalkBreadthFirst, nil
@@ -248,7 +252,7 @@ type nodePathMatcher yaml.Node
 func (pm *nodePathMatcher) Match(node *yaml.Node, fn NodeFunc) error {
 	return Walk(node, func(current, parent *yaml.Node, pos int, opts *WalkOptions) (WalkStatus, error) {
 		if !Equal((*yaml.Node)(pm), current) {
-			return opts.MissStatus, nil
+			return opts.missStatus, nil
 		}
 		if parent != nil && parent.Kind == yaml.MappingNode {
 			err := fn(parent.Content[pos+1])
@@ -287,10 +291,10 @@ func (pm *anyPathMatcher) Match(node *yaml.Node, fn NodeFunc) error {
 		if parent != nil && parent.Kind == yaml.MappingNode {
 			// match on all map keys, so send map value as next node
 			err := fn(parent.Content[pos+1])
-			return opts.MissStatus, err
+			return opts.missStatus, err
 		}
 		err := fn(current)
-		return opts.MissStatus, err
+		return opts.missStatus, err
 	}, pm.walkOpts...)
 }
 
