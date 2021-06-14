@@ -1,0 +1,46 @@
+fs test() {
+	goBase
+	run "go test -race ./..." with option {
+		dir "/src"
+		mount goSrc "/src" with readonly
+	}
+}
+
+fs lint() {
+	withLinter goBase
+	run "golangci-lint run ./..." with option {
+		dir "/src"
+		mount fs {
+			goSrc
+			copy local(".golangci.yml") "." "."
+		} "/src" with readonly
+		goCache "/root"
+	}
+}
+
+fs goSrc() {
+	local "." with option {
+		includePatterns "**/*.go" "go.mod" "go.sum"
+		excludePatterns "**/vendor/**"
+	}
+}
+
+fs goBase() {
+	image "golang:1.16"
+}
+
+fs withLinter(fs base) {
+	base
+	run "/tmp/installers/golangci-lint.sh -b /usr/bin v1.40.1" with option {
+		mount fs {
+			http "https://install.goreleaser.com/github.com/golangci/golangci-lint.sh" with option {
+				chmod 0o755
+			}
+		} "/tmp/installers" with readonly
+	}
+}
+
+option::run goCache(string homedir) {
+	mount scratch format("%s/.cache/go-build", homedir) with cache(format("walky/go-build%s" homedir), "private")
+	mount scratch "/go/pkg/mod" with cache(format("walky/go-mod%s", homedir), "private")
+}

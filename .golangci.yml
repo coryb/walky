@@ -1,0 +1,28 @@
+linters:
+  enable-all: false
+  disable-all: true
+  enable:
+    - deadcode
+    - depguard
+    - gocritic
+    - gofmt
+    - goimports
+    - revive
+    - gosimple
+    - govet
+    - ineffassign
+    - misspell
+    - exportloopref
+    - structcheck
+    - typecheck
+    - unconvert
+    - unparam
+    - varcheck
+run:
+  tests: true
+issues:
+  exclude-use-default: false
+  exclude:
+    - "should have comment(.*)or be unexported"
+  max-same-issues: 0
+  max-issues-per-linter: 0
