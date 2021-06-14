@@ -185,3 +185,15 @@ func HasKey(mapNode *yaml.Node, key interface{}) bool {
 	}, key)
 	return found
 }
+
+func GetKey(mapNode *yaml.Node, key interface{}) (node *yaml.Node) {
+	mapNode = unwrapDocument(mapNode)
+	if mapNode.Kind != yaml.MappingNode {
+		return nil
+	}
+	WalkPath(mapNode, func(n *yaml.Node) error {
+		node = n
+		return nil
+	}, key)
+	return node
+}
