@@ -17,6 +17,26 @@ func unwrapDocument(node *yaml.Node) *yaml.Node {
 	return node
 }
 
+func NewDocumentNode() *yaml.Node {
+	return &yaml.Node{
+		Kind: yaml.DocumentNode,
+	}
+}
+
+func NewMappingNode() *yaml.Node {
+	return &yaml.Node{
+		Kind: yaml.MappingNode,
+		Tag:  "!!map",
+	}
+}
+
+func NewSequenceNode() *yaml.Node {
+	return &yaml.Node{
+		Kind: yaml.SequenceNode,
+		Tag:  "!!seq",
+	}
+}
+
 func ToNode(val interface{}) (*yaml.Node, error) {
 	node := yaml.Node{}
 	switch v := val.(type) {
