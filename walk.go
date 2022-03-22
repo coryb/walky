@@ -104,7 +104,7 @@ func Walk(node *yaml.Node, f WalkFunc, walkOpts ...WalkOpt) error {
 
 	ws, later, err := walk(node, nil, f, 0, opts)
 	if err != nil {
-		return nil
+		return err
 	}
 	switch ws {
 	case WalkExit:

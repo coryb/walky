@@ -1,6 +1,7 @@
 package walky_test
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -254,6 +255,15 @@ func TestWalkPath(t *testing.T) {
 	err = walky.WalkPath(&root, expectedInt(2), "a", 1.0)
 	require.EqualError(t, err, "Unable to make PathMatcher from type float64 (1)")
 	require.False(t, matchFound)
+
+	walkErr := errors.New("walk function failing")
+	err = walky.WalkPath(
+		&root,
+		func(node *yaml.Node) error {
+			return walkErr
+		},
+		"b", "d", "e", 0)
+	require.Equal(t, walkErr, err)
 }
 
 func src() string {
