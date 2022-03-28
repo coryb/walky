@@ -3,6 +3,7 @@ package walky
 import (
 	"fmt"
 	"sort"
+	"strconv"
 
 	"gopkg.in/yaml.v3"
 )
@@ -34,6 +35,40 @@ func NewSequenceNode() *yaml.Node {
 	return &yaml.Node{
 		Kind: yaml.SequenceNode,
 		Tag:  "!!seq",
+	}
+}
+
+// NewStringNode creates a new Node with the value of the provided string.
+func NewStringNode(value string) *yaml.Node {
+	var node yaml.Node
+	node.SetString(value)
+	return &node
+}
+
+// NewBoolNode creates a new Node with the value of the provided bool.
+func NewBoolNode(value bool) *yaml.Node {
+	return &yaml.Node{
+		Kind:  yaml.ScalarNode,
+		Tag:   "!!bool",
+		Value: strconv.FormatBool(value),
+	}
+}
+
+// NewIntNode creates a new Node with the value of the provided int64.
+func NewIntNode(value int64) *yaml.Node {
+	return &yaml.Node{
+		Kind:  yaml.ScalarNode,
+		Tag:   "!!int",
+		Value: strconv.FormatInt(value, 10),
+	}
+}
+
+// NewFloatNode creates a new Node with the value of the provided float64.
+func NewFloatNode(value float64) *yaml.Node {
+	return &yaml.Node{
+		Kind:  yaml.ScalarNode,
+		Tag:   "!!float",
+		Value: strconv.FormatFloat(value, 'f', -1, 64),
 	}
 }
 
@@ -220,4 +255,60 @@ func GetKey(mapNode *yaml.Node, key interface{}) (node *yaml.Node) {
 		return nil
 	}, key)
 	return node
+}
+
+// GetIndex returns the index of the target node found in the parent node.  If
+// the parent is a MappingNode the index corresponds to the key node (the value
+// will be the key node index + 1).   If the parent node is not a SequenceNode
+// or a MappingNode, then -1 will be returned. Also if the target node is not
+// found then -1 will be returned.
+func GetIndex(parent *yaml.Node, target *yaml.Node) int {
+	parent = unwrapDocument(parent)
+	if parent.Kind != yaml.MappingNode && parent.Kind != yaml.SequenceNode {
+		return -1
+	}
+	incrementBy := 1
+	if parent.Kind == yaml.MappingNode {
+		incrementBy = 2
+	}
+	for i := 0; i < len(parent.Content); i += incrementBy {
+		if Equal(parent.Content[i], target) {
+			return i
+		}
+	}
+	return -1
+}
+
+// GetKeyValue is used to to simplify getting both the key and value nodes
+// from the provided MappingNode.  If the key node is not found then the
+// returned nodes will both be `nil`
+func GetKeyValue(mapNode *yaml.Node, key *yaml.Node) (keyNode *yaml.Node, valueNode *yaml.Node) {
+	mapNode = unwrapDocument(mapNode)
+	if mapNode.Kind != yaml.MappingNode {
+		return nil, nil
+	}
+	ix := GetIndex(mapNode, key)
+	if ix < 0 {
+		return nil, nil
+	}
+	return mapNode.Content[ix], mapNode.Content[ix+1]
+}
+
+// Remove will delete target node from parent node.  If parent is a MappingNode
+// then target should correspond to the mapping Key.  If parent is a
+// SequenceNode then the target node will be deleted.  Returns true if and only
+// if the target was found in the parent.
+func Remove(parent *yaml.Node, target *yaml.Node) bool {
+	parent = unwrapDocument(parent)
+	ix := GetIndex(parent, target)
+	if ix < 0 {
+		return false
+	}
+	if parent.Kind == yaml.MappingNode {
+		// delete key and value nodes
+		parent.Content = append(parent.Content[:ix], parent.Content[ix+2:]...)
+		return true
+	}
+	parent.Content = append(parent.Content[:ix], parent.Content[ix+1:]...)
+	return true
 }
