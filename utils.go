@@ -1,14 +1,20 @@
 package walky
 
 import (
+	"errors"
 	"fmt"
+	"io"
+	"os"
 	"sort"
 	"strconv"
 
 	"gopkg.in/yaml.v3"
 )
 
-func unwrapDocument(node *yaml.Node) *yaml.Node {
+// UnwrapDocument removes the root node if and only if the root node has a Kind
+// value of `yaml.DocumentNode`.  It returns the first child node of the
+// root, which is typically the document data.
+func UnwrapDocument(node *yaml.Node) *yaml.Node {
 	if node.Kind == yaml.DocumentNode {
 		if len(node.Content) < 1 {
 			return node // empty document
@@ -76,9 +82,9 @@ func ToNode(val interface{}) (*yaml.Node, error) {
 	node := yaml.Node{}
 	switch v := val.(type) {
 	case yaml.Node:
-		return unwrapDocument(&v), nil
+		return UnwrapDocument(&v), nil
 	case *yaml.Node:
-		return unwrapDocument(v), nil
+		return UnwrapDocument(v), nil
 	case string:
 		node.SetString(v)
 		return &node, nil
@@ -91,13 +97,13 @@ func ToNode(val interface{}) (*yaml.Node, error) {
 	if err != nil {
 		return nil, err
 	}
-	return unwrapDocument(&node), nil
+	return UnwrapDocument(&node), nil
 }
 
 type sortableNodeMap []*yaml.Node
 
 func SortableNodeMap(mapNode *yaml.Node) sort.Interface {
-	mapNode = unwrapDocument(mapNode)
+	mapNode = UnwrapDocument(mapNode)
 	// if node is not a map this becomes a no-op and we
 	// will instead sort and empty slice.
 	if mapNode.Kind != yaml.MappingNode {
@@ -139,12 +145,8 @@ func Equal(a *yaml.Node, b *yaml.Node) bool {
 	if a == nil || b == nil {
 		return false
 	}
-	if a.Kind == yaml.AliasNode {
-		a = a.Alias
-	}
-	if b.Kind == yaml.AliasNode {
-		b = b.Alias
-	}
+	a = Indirect(a)
+	b = Indirect(b)
 	if a.Kind != b.Kind {
 		return false
 	}
@@ -192,7 +194,7 @@ func AssignNode(destNode, srcNode *yaml.Node) {
 }
 
 func AssignMapNode(mapNode, keyNode, valNode *yaml.Node) error {
-	mapNode = unwrapDocument(mapNode)
+	mapNode = UnwrapDocument(mapNode)
 	if mapNode.Kind != yaml.MappingNode {
 		return fmt.Errorf("AssignMapNode called on invalid type: %s", mapNode.Tag)
 	}
@@ -233,7 +235,7 @@ func AppendNode(listNode, valNode *yaml.Node) error {
 }
 
 func HasKey(mapNode *yaml.Node, key interface{}) bool {
-	mapNode = unwrapDocument(mapNode)
+	mapNode = UnwrapDocument(mapNode)
 	if mapNode.Kind != yaml.MappingNode {
 		return false
 	}
@@ -246,7 +248,7 @@ func HasKey(mapNode *yaml.Node, key interface{}) bool {
 }
 
 func GetKey(mapNode *yaml.Node, key interface{}) (node *yaml.Node) {
-	mapNode = unwrapDocument(mapNode)
+	mapNode = UnwrapDocument(mapNode)
 	if mapNode.Kind != yaml.MappingNode {
 		return nil
 	}
@@ -263,7 +265,7 @@ func GetKey(mapNode *yaml.Node, key interface{}) (node *yaml.Node) {
 // or a MappingNode, then -1 will be returned. Also if the target node is not
 // found then -1 will be returned.
 func GetIndex(parent *yaml.Node, target *yaml.Node) int {
-	parent = unwrapDocument(parent)
+	parent = UnwrapDocument(parent)
 	if parent.Kind != yaml.MappingNode && parent.Kind != yaml.SequenceNode {
 		return -1
 	}
@@ -283,7 +285,7 @@ func GetIndex(parent *yaml.Node, target *yaml.Node) int {
 // from the provided MappingNode.  If the key node is not found then the
 // returned nodes will both be `nil`
 func GetKeyValue(mapNode *yaml.Node, key *yaml.Node) (keyNode *yaml.Node, valueNode *yaml.Node) {
-	mapNode = unwrapDocument(mapNode)
+	mapNode = UnwrapDocument(mapNode)
 	if mapNode.Kind != yaml.MappingNode {
 		return nil, nil
 	}
@@ -299,7 +301,7 @@ func GetKeyValue(mapNode *yaml.Node, key *yaml.Node) (keyNode *yaml.Node, valueN
 // SequenceNode then the target node will be deleted.  Returns true if and only
 // if the target was found in the parent.
 func Remove(parent *yaml.Node, target *yaml.Node) bool {
-	parent = unwrapDocument(parent)
+	parent = UnwrapDocument(parent)
 	ix := GetIndex(parent, target)
 	if ix < 0 {
 		return false
@@ -311,4 +313,66 @@ func Remove(parent *yaml.Node, target *yaml.Node) bool {
 	}
 	parent.Content = append(parent.Content[:ix], parent.Content[ix+1:]...)
 	return true
+}
+
+// CopyNode will do a deep copy of the src Node and return a copy
+func CopyNode(src *yaml.Node) *yaml.Node {
+	copied := map[*yaml.Node]*yaml.Node{}
+	return copyNode(src, copied)
+}
+
+// copyNode will do a deep copy of src, the copied map is used to prevent
+// extra work if we have already seen the src node.  This will allow
+// the yaml.Node.Alias to continue to point to the same (copied) node.
+func copyNode(src *yaml.Node, copied map[*yaml.Node]*yaml.Node) *yaml.Node {
+	if src == nil {
+		return nil
+	}
+	if alias, ok := copied[src]; ok {
+		return alias
+	}
+	cp := *src
+	if src.Alias != nil {
+		cp.Alias = copyNode(src.Alias, copied)
+	}
+	cp.Content = make([]*yaml.Node, 0, len(src.Content))
+	for _, c := range src.Content {
+		cp.Content = append(cp.Content, copyNode(c, copied))
+	}
+	copied[src] = &cp
+	return &cp
+}
+
+// ShallowCopyNode will do a shallow copy of the src Node and return a copy.
+// Any Contents and Alias will not be copied.
+func ShallowCopyNode(src *yaml.Node) *yaml.Node {
+	if src == nil {
+		return nil
+	}
+	cp := *src
+	return &cp
+}
+
+// ReadFile is a helper function to read a file and return a yaml.Node
+func ReadFile(filepath string) (*yaml.Node, error) {
+	fh, err := os.Open(filepath)
+	if err != nil {
+		return nil, err
+	}
+	defer fh.Close()
+	dec := yaml.NewDecoder(fh)
+	var node yaml.Node
+	if err = dec.Decode(&node); err != nil && !errors.Is(err, io.EOF) {
+		return nil, err
+	}
+	return &node, nil
+}
+
+// Indirect will return the aliased node if this node is an alias,
+// otherwise it will return the original node.
+func Indirect(node *yaml.Node) *yaml.Node {
+	for node.Kind == yaml.AliasNode {
+		node = node.Alias
+	}
+	return node
 }

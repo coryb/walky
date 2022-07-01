@@ -87,7 +87,7 @@ func Walk(node *yaml.Node, f WalkFunc, walkOpts ...WalkOpt) error {
 	for _, o := range walkOpts {
 		o(opts)
 	}
-	node = unwrapDocument(node)
+	node = UnwrapDocument(node)
 	ws, err := f(node, nil, -1, opts)
 	if opts.trace != nil {
 		opts.trace(node, nil, -1, 0, ws, err)
@@ -306,7 +306,7 @@ func WalkPathMatchers(root *yaml.Node, fn NodeFunc, matchers ...PathMatcher) err
 			return matchers[i].Match(node, prevFn)
 		}
 	}
-	return matchFn(unwrapDocument(root))
+	return matchFn(UnwrapDocument(root))
 }
 
 func WalkPath(root *yaml.Node, fn NodeFunc, path ...interface{}) error {
