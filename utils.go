@@ -78,6 +78,24 @@ func NewFloatNode(value float64) *yaml.Node {
 	}
 }
 
+// KindString will return a human-readable string that represents the
+// yaml.Kind arguments.
+func KindString(k yaml.Kind) string {
+	switch k {
+	case yaml.DocumentNode:
+		return "document"
+	case yaml.SequenceNode:
+		return "sequence"
+	case yaml.MappingNode:
+		return "mapping"
+	case yaml.ScalarNode:
+		return "scalar"
+	case yaml.AliasNode:
+		return "alias"
+	}
+	return "unknown"
+}
+
 func ToNode(val interface{}) (*yaml.Node, error) {
 	node := yaml.Node{}
 	switch v := val.(type) {
@@ -160,7 +178,6 @@ func Equal(a *yaml.Node, b *yaml.Node) bool {
 		return false
 	}
 	if a.Kind == yaml.MappingNode {
-		// FIXME maps should be allowed to be random order
 		aContent := make([]*yaml.Node, len(a.Content))
 		bContent := make([]*yaml.Node, len(b.Content))
 		copy(aContent, a.Content)
