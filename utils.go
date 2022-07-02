@@ -393,3 +393,36 @@ func Indirect(node *yaml.Node) *yaml.Node {
 	}
 	return node
 }
+
+// RangerFunc is the callback used to iterate over a map via RangeMap.  The
+// function is called for each key/value pair found in the map.  If an error is
+// returned then RangeMap will immediately return the error.  The bool return
+// value can be used to stop the iteration (when false) without an error.
+type RangerFunc func(key, value *yaml.Node) (bool, error)
+
+// RangeMap will iterate over `node`, calling the range func for each key/value
+// pair. An error will be returned if the node is not a mapping node (or an
+// alias referencing a mapping node).  An error will be returned unless the
+// node.Content is an even length.  If the range func returns an error it
+// will be returned immediately.
+func RangeMap(node *yaml.Node, f RangerFunc) error {
+	node = Indirect(node)
+	if node.Kind != yaml.MappingNode {
+		return fmt.Errorf("expected node kind %s, got %s", KindString(yaml.MappingNode), KindString(node.Kind))
+	}
+	// node content is pairs of [key, value], so must be even length
+	if len(node.Content)%2 != 0 {
+		return fmt.Errorf("unexpected node content length %d, must be even", len(node.Content))
+	}
+	l := len(node.Content)
+	for i := 0; i < l; i += 2 {
+		cont, err := f(node.Content[i], node.Content[i+1])
+		if err != nil {
+			return err
+		}
+		if !cont {
+			return nil
+		}
+	}
+	return nil
+}
