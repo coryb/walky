@@ -388,6 +388,7 @@ func ReadFile(filepath string) (*yaml.Node, error) {
 // Indirect will return the aliased node if this node is an alias,
 // otherwise it will return the original node.
 func Indirect(node *yaml.Node) *yaml.Node {
+	node = UnwrapDocument(node)
 	for node.Kind == yaml.AliasNode {
 		node = node.Alias
 	}
