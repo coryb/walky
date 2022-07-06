@@ -395,15 +395,15 @@ func Indirect(node *yaml.Node) *yaml.Node {
 	return node
 }
 
-// StopRangeError can be returned from the RangerFunc to immediately stop
+// ErrStopRange can be returned from the RangerFunc to immediately stop
 // iterating over the map.  If this is returned from the RangerFunc
 // then RangeMap will return nil.
-var StopRangeError = errors.New("stop ranging")
+var ErrStopRange = errors.New("stop ranging")
 
 // RangerFunc is the callback used to iterate over a map via RangeMap.  The
 // function is called for each key/value pair found in the map.  If an error is
 // returned then RangeMap will immediately return the error.  To stop iteration
-// without RangeMap returning an error, you can return StopRangeError.
+// without RangeMap returning an error, you can return ErrStopRange.
 type RangerFunc func(key, value *yaml.Node) error
 
 // RangeMap will iterate over `node`, calling the RangerFunc for each key/value
@@ -424,7 +424,7 @@ func RangeMap(node *yaml.Node, f RangerFunc) error {
 	for i := 0; i < l; i += 2 {
 		err := f(node.Content[i], node.Content[i+1])
 		if err != nil {
-			if errors.Is(err, StopRangeError) {
+			if errors.Is(err, ErrStopRange) {
 				return nil
 			}
 			return err
