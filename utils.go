@@ -404,6 +404,31 @@ func Indirect(node *yaml.Node) *yaml.Node {
 	return node
 }
 
+type rangeOption struct {
+	mergeLast bool
+}
+
+type RangeOption func(*rangeOption)
+
+// WithMergesLast changes the `!!merge` node processing from being
+// inline to be appended to the current iteration.  For example:
+// ```yaml
+// defs:
+//   - &mymap {key: 1}
+// mystuff:
+//   <<: *mymap
+//   key: 2
+// ```
+// by default RangeMap will process the `!!merge` since it is the first
+// key in `mystuff`, so the RangerFunc will see `key: 1` first, then `key: 2`.
+// If `WithMergesLast` is used, then the RangerFunc will see `key: 2` first,
+// then `key: 1`
+func WithMergesLast() RangeOption {
+	return func(o *rangeOption) {
+		o.mergeLast = true
+	}
+}
+
 // ErrStopRange can be returned from the RangerFunc to immediately stop
 // iterating over the map.  If this is returned from the RangerFunc
 // then RangeMap will return nil.
@@ -420,7 +445,12 @@ type RangerFunc func(key, value *yaml.Node) error
 // alias referencing a mapping node).  An error will be returned unless the
 // node.Content is an even length.  If the RangerFunc returns an error it
 // will be returned immediately.
-func RangeMap(node *yaml.Node, f RangerFunc) error {
+func RangeMap(node *yaml.Node, f RangerFunc, opts ...RangeOption) error {
+	o := &rangeOption{}
+	for _, optFunc := range opts {
+		optFunc(o)
+	}
+
 	node = Indirect(node)
 	if IsNull(node) {
 		return nil
@@ -433,24 +463,41 @@ func RangeMap(node *yaml.Node, f RangerFunc) error {
 		return fmt.Errorf("unexpected node content length %d, must be even", len(node.Content))
 	}
 	l := len(node.Content)
+	content := node.Content
+	if o.mergeLast {
+		content = make([]*yaml.Node, l)
+		copy(content, node.Content)
+	}
 	for i := 0; i < l; i += 2 {
-		if node.Content[i].Tag == "!!merge" {
-			if node.Content[i+1].Kind == yaml.SequenceNode {
-				for _, elem := range node.Content[i+1].Content {
-					err := RangeMap(elem, f)
+		if content[i].Tag == "!!merge" {
+			if content[i+1].Kind == yaml.SequenceNode {
+				for _, elem := range content[i+1].Content {
+					elem = Indirect(elem)
+					if o.mergeLast {
+						content = append(content, elem.Content...)
+						l += len(elem.Content)
+						continue
+					}
+					err := RangeMap(elem, f, opts...)
 					if err != nil {
 						return err
 					}
 				}
 			} else {
-				err := RangeMap(node.Content[i+1], f)
+				mapNode := Indirect(content[i+1])
+				if o.mergeLast {
+					content = append(content, mapNode.Content...)
+					l += len(mapNode.Content)
+					continue
+				}
+				err := RangeMap(mapNode, f, opts...)
 				if err != nil {
 					return err
 				}
 			}
 			continue
 		}
-		err := f(node.Content[i], node.Content[i+1])
+		err := f(content[i], content[i+1])
 		if err != nil {
 			if errors.Is(err, ErrStopRange) {
 				return nil
