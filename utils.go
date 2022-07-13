@@ -24,6 +24,15 @@ func UnwrapDocument(node *yaml.Node) *yaml.Node {
 	return node
 }
 
+// IsNull will return true if the node Kind is ScalarNode and the
+// node tag is !!null
+func IsNull(node *yaml.Node) bool {
+	if node.Kind != yaml.ScalarNode {
+		return false
+	}
+	return node.Tag == "!!null"
+}
+
 func NewDocumentNode() *yaml.Node {
 	return &yaml.Node{
 		Kind: yaml.DocumentNode,
@@ -413,6 +422,9 @@ type RangerFunc func(key, value *yaml.Node) error
 // will be returned immediately.
 func RangeMap(node *yaml.Node, f RangerFunc) error {
 	node = Indirect(node)
+	if IsNull(node) {
+		return nil
+	}
 	if node.Kind != yaml.MappingNode {
 		return fmt.Errorf("expected node kind %s, got %s", KindString(yaml.MappingNode), KindString(node.Kind))
 	}
@@ -422,6 +434,22 @@ func RangeMap(node *yaml.Node, f RangerFunc) error {
 	}
 	l := len(node.Content)
 	for i := 0; i < l; i += 2 {
+		if node.Content[i].Tag == "!!merge" {
+			if node.Content[i+1].Kind == yaml.SequenceNode {
+				for _, elem := range node.Content[i+1].Content {
+					err := RangeMap(elem, f)
+					if err != nil {
+						return err
+					}
+				}
+			} else {
+				err := RangeMap(node.Content[i+1], f)
+				if err != nil {
+					return err
+				}
+			}
+			continue
+		}
 		err := f(node.Content[i], node.Content[i+1])
 		if err != nil {
 			if errors.Is(err, ErrStopRange) {
