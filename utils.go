@@ -411,7 +411,8 @@ func Indirect(node *yaml.Node) *yaml.Node {
 }
 
 type rangeOption struct {
-	mergeLast bool
+	mergeLast               bool
+	allowDuplicateMergeKeys bool
 }
 
 type RangeOption func(*rangeOption)
@@ -420,18 +421,43 @@ type RangeOption func(*rangeOption)
 // inline to be appended to the current iteration.  For example:
 //
 //	defs:
-//	  - &mymap {key: 1}
+//	  - &mymap {a: 1}
 //	mystuff:
 //	  <<: *mymap
-//	  key: 2
+//	 b: 2
 //
 // by default RangeMap will process the `!!merge` since it is the first
-// key in `mystuff`, so the RangerFunc will see `key: 1` first, then `key: 2`.
-// If `WithMergesLast` is used, then the RangerFunc will see `key: 2` first,
-// then `key: 1`
+// key in `mystuff`, so the RangerFunc will see `a: 1` first, then `b: 2`.
+// If `WithMergesLast` is used, then the RangerFunc will see `b: 2` first,
+// then `a: 1`
 func WithMergesLast() RangeOption {
 	return func(o *rangeOption) {
 		o.mergeLast = true
+	}
+}
+
+// WithAllowDuplicateMergeKeys will toggle the default behavior, which is to
+// suppress duplicated keys that are from `!!merge` fields.  So
+//
+//	defs:
+//	  - &commonStuff
+//	    mymap:
+//	      a: 1
+//	      other: 42
+//	stuff:
+//	  <<: *commonStuff
+//	  mymap:
+//	    b: 2
+//
+// With the above document by default `mymap` from `*commonStuff` is skipped
+// when iterating over they keys of `stuff`.  This is consistent with the
+// behavior of calling `yaml.Unmarshal(config, dest)` with the above content
+// and a non yaml.Node destination (ie struct, map etc). When using
+// WithAllowDuplicateMergeKeys the RangerFunc will see all keys from the
+// `!!merge` sources, so will see `mymap` twice in this example.
+func WithAllowDuplicateMergeKeys() RangeOption {
+	return func(o *rangeOption) {
+		o.allowDuplicateMergeKeys = true
 	}
 }
 
@@ -480,6 +506,26 @@ func RangeMap(node *yaml.Node, f RangerFunc, opts ...RangeOption) error {
 		content = make([]*yaml.Node, l)
 		copy(content, node.Content)
 	}
+
+	primaryKeys := []*yaml.Node{}
+	mergeFunc := f
+	if !o.allowDuplicateMergeKeys {
+		// if we are not allowing default keys (the default) we
+		// need to collect the top-level keys of this map so that
+		// we can skip keys of the same name that might be included
+		// via `!!merge` keys.
+		for i := 0; i < l; i += 2 {
+			primaryKeys = append(primaryKeys, Indirect(content[i]))
+		}
+		mergeFunc = func(key, value *yaml.Node) error {
+			for _, primaryKey := range primaryKeys {
+				if Equal(key, primaryKey) {
+					return nil
+				}
+			}
+			return f(key, value)
+		}
+	}
 	for i := 0; i < l; i += 2 {
 		if content[i].Tag == "!!merge" {
 			if content[i+1].Kind == yaml.SequenceNode {
@@ -490,7 +536,7 @@ func RangeMap(node *yaml.Node, f RangerFunc, opts ...RangeOption) error {
 						l += len(elem.Content)
 						continue
 					}
-					err := RangeMap(elem, f, opts...)
+					err := RangeMap(elem, mergeFunc, opts...)
 					if err != nil {
 						return err
 					}
@@ -502,7 +548,7 @@ func RangeMap(node *yaml.Node, f RangerFunc, opts ...RangeOption) error {
 					l += len(mapNode.Content)
 					continue
 				}
-				err := RangeMap(mapNode, f, opts...)
+				err := RangeMap(mapNode, mergeFunc, opts...)
 				if err != nil {
 					return err
 				}
