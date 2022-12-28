@@ -222,7 +222,10 @@ func AssignNode(destNode, srcNode *yaml.Node) {
 func AssignMapNode(mapNode, keyNode, valNode *yaml.Node) error {
 	mapNode = UnwrapDocument(mapNode)
 	if mapNode.Kind != yaml.MappingNode {
-		return fmt.Errorf("AssignMapNode called on invalid type: %s", mapNode.Tag)
+		return NewYAMLError(
+			fmt.Errorf("AssignMapNode called on invalid type: %s", mapNode.Tag),
+			mapNode,
+		)
 	}
 
 	found := false
@@ -254,7 +257,10 @@ func AssignMapNode(mapNode, keyNode, valNode *yaml.Node) error {
 
 func AppendNode(listNode, valNode *yaml.Node) error {
 	if listNode.Kind != yaml.SequenceNode {
-		return fmt.Errorf("AppendNode called on invalid type: %s", listNode.Tag)
+		return NewYAMLError(
+			fmt.Errorf("AppendNode called on invalid type: %s", listNode.Tag),
+			listNode,
+		)
 	}
 	listNode.Content = append(listNode.Content, valNode)
 	return nil
@@ -389,7 +395,7 @@ func ReadFile(filepath string) (*yaml.Node, error) {
 	dec := yaml.NewDecoder(fh)
 	var node yaml.Node
 	if err = dec.Decode(&node); err != nil && !errors.Is(err, io.EOF) {
-		return nil, err
+		return nil, ErrFilename(err, filepath)
 	}
 	return &node, nil
 }
@@ -412,13 +418,13 @@ type RangeOption func(*rangeOption)
 
 // WithMergesLast changes the `!!merge` node processing from being
 // inline to be appended to the current iteration.  For example:
-// ```yaml
-// defs:
-//   - &mymap {key: 1}
-// mystuff:
-//   <<: *mymap
-//   key: 2
-// ```
+//
+//	defs:
+//	  - &mymap {key: 1}
+//	mystuff:
+//	  <<: *mymap
+//	  key: 2
+//
 // by default RangeMap will process the `!!merge` since it is the first
 // key in `mystuff`, so the RangerFunc will see `key: 1` first, then `key: 2`.
 // If `WithMergesLast` is used, then the RangerFunc will see `key: 2` first,
@@ -456,11 +462,17 @@ func RangeMap(node *yaml.Node, f RangerFunc, opts ...RangeOption) error {
 		return nil
 	}
 	if node.Kind != yaml.MappingNode {
-		return fmt.Errorf("expected node kind %s, got %s", KindString(yaml.MappingNode), KindString(node.Kind))
+		return NewYAMLError(
+			fmt.Errorf("expected node kind %q, got %q", KindString(yaml.MappingNode), KindString(node.Kind)),
+			node,
+		)
 	}
 	// node content is pairs of [key, value], so must be even length
 	if len(node.Content)%2 != 0 {
-		return fmt.Errorf("unexpected node content length %d, must be even", len(node.Content))
+		return NewYAMLError(
+			fmt.Errorf("unexpected node content length %d, must be even", len(node.Content)),
+			node,
+		)
 	}
 	l := len(node.Content)
 	content := node.Content

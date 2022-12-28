@@ -9,9 +9,9 @@ import (
 type WalkStatus int
 
 const (
-	WalkExit         WalkStatus = iota
-	WalkDepthFirst              // depth-first
-	WalkBreadthFirst            // breadth-first
+	WalkExit WalkStatus = iota
+	WalkDepthFirst
+	WalkBreadthFirst
 	WalkPrune
 )
 
@@ -30,8 +30,10 @@ func (ws WalkStatus) String() string {
 	}
 }
 
-type WalkFunc func(current, parent *yaml.Node, position int, opts *WalkOptions) (WalkStatus, error)
-type NodeFunc func(node *yaml.Node) error
+type (
+	WalkFunc func(current, parent *yaml.Node, position int, opts *WalkOptions) (WalkStatus, error)
+	NodeFunc func(node *yaml.Node) error
+)
 
 type WalkOptions struct {
 	missStatus  WalkStatus
