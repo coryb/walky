@@ -2,22 +2,19 @@ linters:
   enable-all: false
   disable-all: true
   enable:
-    - deadcode
+    - unused
     - depguard
     - gocritic
     - gofmt
     - goimports
-    - revive
     - gosimple
     - govet
     - ineffassign
     - misspell
     - exportloopref
-    - structcheck
     - typecheck
     - unconvert
     - unparam
-    - varcheck
 run:
   tests: true
 issues:
